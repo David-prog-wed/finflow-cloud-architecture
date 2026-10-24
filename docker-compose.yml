@@ -1,0 +1,44 @@
+version: "3.9"
+
+services:
+  finflow-api:
+    build: ./backend
+    container_name: finflow-api
+    restart: always
+    environment:
+      - DATABASE_PATH=/data/finflow.db
+      - MONTHLY_BUDGET_LIMIT=5000.00
+    volumes:
+      - finflow_db_data:/data
+    networks:
+      - finflow_net
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  nginx-gateway:
+    build: ./frontend
+    container_name: finflow-gateway
+    restart: always
+    ports:
+      - "127.0.0.1:8085:80"
+    depends_on:
+      finflow-api:
+        condition: service_healthy
+    networks:
+      - finflow_net
+
+volumes:
+  finflow_db_data:
+
+networks:
+  finflow_net:
+    driver: bridge
