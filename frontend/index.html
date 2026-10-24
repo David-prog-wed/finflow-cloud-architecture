@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FinFlow Cloud | Arquitectura de Software</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-slate-900 text-slate-100 min-h-screen p-6">
+  <div class="max-w-5xl mx-auto space-y-6">
+    <!-- Encabezado -->
+    <header
+      class="flex flex-col md:flex-row justify-between items-center bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-lg">
+      <div>
+        <h1 class="text-2xl font-bold text-emerald-400">⚡ FinFlow Cloud</h1>
+        <p class="text-sm text-slate-400">Sistema Modular de Control Presupuestal • Arquitectura Cloud-Native</p>
+      </div>
+      <div class="flex items-center gap-3 mt-3 md:mt-0">
+        <span id="health-badge"
+          class="px-3 py-1 text-xs font-semibold rounded-full bg-emerald-900 text-emerald-300 border border-emerald-600">
+          ● API & DB Healthy
+        </span>
+        <a href="/docs" target="_blank"
+          class="px-3 py-1 text-xs bg-indigo-600 hover:bg-indigo-500 rounded-lg font-medium transition">
+          Swagger / OpenAPI ↗
+        </a>
+      </div>
+    </header>
+
+    <!-- Alerta de Presupuesto (RF-04) -->
+    <div id="alert-box" class="hidden p-4 rounded-xl font-medium border"></div>
+
+    <!-- Tarjetas de Resumen (RF-03) -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
+        <p class="text-xs text-slate-400 uppercase">Ingresos Totales</p>
+        <p id="val-income" class="text-2xl font-bold text-emerald-400">$0.00</p>
+      </div>
+      <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
+        <p class="text-xs text-slate-400 uppercase">Gastos Operativos</p>
+        <p id="val-expense" class="text-2xl font-bold text-rose-400">$0.00</p>
+      </div>
+      <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
+        <p class="text-xs text-slate-400 uppercase">Balance Neto</p>
+        <p id="val-balance" class="text-2xl font-bold text-sky-400">$0.00</p>
+      </div>
+      <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
+        <p class="text-xs text-slate-400 uppercase">Uso de Presupuesto ($5,000)</p>
+        <p id="val-usage" class="text-2xl font-bold text-amber-400">0%</p>
+        <div class="w-full bg-slate-700 h-2 rounded-full mt-2 overflow-hidden">
+          <div id="usage-bar" class="bg-emerald-500 h-2 transition-all duration-300" style="width: 0%"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panel Principal -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <!-- Formulario de Registro (RF-01) -->
+      <div class="bg-slate-800 p-5 rounded-xl border border-slate-700 h-fit">
+        <h2 class="text-lg font-semibold mb-4 text-slate-200">Registrar Transacción</h2>
+        <form id="tx-form" class="space-y-4">
+          <div>
+            <label class="text-xs text-slate-400">Concepto / Descripción</label>
+            <input type="text" id="title" required minlength="3" placeholder="Ej. Servidores Cloud"
+              class="w-full mt-1 p-2.5 rounded-lg bg-slate-900 border border-slate-700 text-sm focus:border-emerald-500 outline-none">
+          </div>
+          <div>
+            <label class="text-xs text-slate-400">Monto (USD)</label>
+            <input type="number" id="amount" required min="0.01" step="0.01" placeholder="1200.00"
+              class="w-full mt-1 p-2.5 rounded-lg bg-slate-900 border border-slate-700 text-sm focus:border-emerald-500 outline-none">
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="text-xs text-slate-400">Tipo</label>
+              <select id="type" class="w-full mt-1 p-2.5 rounded-lg bg-slate-900 border border-slate-700 text-sm">
+                <option value="EXPENSE">Gasto (-)</option>
+                <option value="INCOME">Ingreso (+)</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-xs text-slate-400">Categoría</label>
+              <select id="category" class="w-full mt-1 p-2.5 rounded-lg bg-slate-900 border border-slate-700 text-sm">
+                <option value="Infraestructura">Infraestructura</option>
+                <option value="Operaciones">Operaciones</option>
+                <option value="Nomina">Nómina</option>
+                <option value="Licencias">Licencias</option>
+              </select>
+            </div>
+          </div>
+          <button type="submit"
+            class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-lg transition shadow-md">
+            Guardar Movimiento
+          </button>
+        </form>
+      </div>
+
+      <!-- Listado y Filtro (RF-02 & RF-05) -->
+      <div class="lg:col-span-2 bg-slate-800 p-5 rounded-xl border border-slate-700">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-lg font-semibold text-slate-200">Historial de Transacciones</h2>
+          <select id="filter-category" class="p-2 rounded-lg bg-slate-900 border border-slate-700 text-xs">
+            <option value="TODAS">Todas las categorías</option>
+            <option value="Infraestructura">Infraestructura</option>
+            <option value="Operaciones">Operaciones</option>
+            <option value="Nomina">Nómina</option>
+            <option value="Licencias">Licencias</option>
+          </select>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm">
+            <thead class="text-xs text-slate-400 uppercase border-b border-slate-700">
+              <tr>
+                <th class="pb-3">Concepto</th>
+                <th class="pb-3">Categoría</th>
+                <th class="pb-3">Fecha UTC</th>
+                <th class="pb-3 text-right">Monto</th>
+                <th class="pb-3 text-center">Acción</th>
+              </tr>
+            </thead>
+            <tbody id="tx-list" class="divide-y divide-slate-700/60"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API = '/api/v1';
+
+    async function refreshData() {
+      const cat = document.getElementById('filter-category').value;
+      const [txRes, sumRes] = await Promise.all([
+        fetch(`${API}/transactions?category=${cat}`),
+        fetch(`${API}/summary`)
+      ]);
+      const transactions = await txRes.json();
+      const summary = await sumRes.json();
+
+      // Renderizar métricas
+      document.getElementById('val-income').textContent = `$${summary.total_income.toLocaleString()}`;
+      document.getElementById('val-expense').textContent = `$${summary.total_expenses.toLocaleString()}`;
+      document.getElementById('val-balance').textContent = `$${summary.net_balance.toLocaleString()}`;
+      document.getElementById('val-usage').textContent = `${summary.budget_usage_percent}%`;
+
+      const bar = document.getElementById('usage-bar');
+      bar.style.width = `${Math.min(summary.budget_usage_percent, 100)}%`;
+      bar.className = summary.budget_alert ? 'bg-rose-500 h-2 transition-all duration-300' : 'bg-emerald-500 h-2 transition-all duration-300';
+
+      const alertBox = document.getElementById('alert-box');
+      alertBox.classList.remove('hidden');
+      alertBox.textContent = summary.alert_message;
+      alertBox.className = summary.budget_alert
+        ? 'p-4 rounded-xl font-medium border bg-rose-950/70 border-rose-600 text-rose-200'
+        : 'p-4 rounded-xl font-medium border bg-emerald-950/50 border-emerald-700 text-emerald-300';
+
+      // Renderizar tabla
+      const tbody = document.getElementById('tx-list');
+      tbody.innerHTML = transactions.map(t => `
+                <tr class="hover:bg-slate-700/30">
+                    <td class="py-3 font-medium">${t.title}</td>
+                    <td class="py-3"><span class="px-2 py-0.5 text-xs rounded bg-slate-700">${t.category}</span></td>
+                    <td class="py-3 text-xs text-slate-400">${t.created_at}</td>
+                    <td class="py-3 text-right font-semibold ${t.type === 'INCOME' ? 'text-emerald-400' : 'text-rose-400'}">
+                        ${t.type === 'INCOME' ? '+' : '-'}$${t.amount.toLocaleString()}
+                    </td>
+                    <td class="py-3 text-center">
+                        <button onclick="deleteTx(${t.id})" class="text-xs text-rose-400 hover:underline">Eliminar</button>
+                    </td>
+                </tr>
+            `).join('');
+    }
+
+    document.getElementById('tx-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const payload = {
+        title: document.getElementById('title').value,
+        amount: parseFloat(document.getElementById('amount').value),
+        type: document.getElementById('type').value,
+        category: document.getElementById('category').value
+      };
+      await fetch(`${API}/transactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      e.target.reset();
+      refreshData();
+    });
+
+    async function deleteTx(id) {
+      await fetch(`${API}/transactions/${id}`, { method: 'DELETE' });
+      refreshData();
+    }
+
+    document.getElementById('filter-category').addEventListener('change', refreshData);
+    refreshData();
+  </script>
+</body>
+
+</html>
