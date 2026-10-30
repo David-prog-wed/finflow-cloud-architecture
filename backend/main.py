@@ -1,5 +1,6 @@
 import os
 import sqlite3
+import httpx
 from datetime import datetime
 from typing import List, Optional
 from fastapi import FastAPI, HTTPException, Depends, Query, status
@@ -29,6 +30,13 @@ class SummaryResponseDTO(BaseModel):
     budget_usage_percent: float
     budget_alert: bool
     alert_message: str
+
+class AIAnalysisRequestDTO(BaseModel):
+    summary_data: SummaryResponseDTO
+    recent_transactions: List[TransactionResponseDTO]
+
+class AIAnalysisResponseDTO(BaseModel):
+    ai_recommendation: str
 
 # --- PATRÓN: REPOSITORY (Capa de Acceso a Datos) ---
 class TransactionRepository:
@@ -122,12 +130,48 @@ class FinanceService:
             alert_message=msg
         )
 
+class AIFinanceService:
+    def __init__(self):
+        self.ai_endpoint = "http://172.17.0.1:5001/v1/chat/completions"
+        
+    async def analyze_budget(self, data: AIAnalysisRequestDTO) -> AIAnalysisResponseDTO:
+        prompt = f"""
+        Actúa como un director financiero corporativo.
+        El presupuesto total mensual es: ${data.summary_data.budget_limit}
+        Se ha gastado: ${data.summary_data.total_expenses} ({data.summary_data.budget_usage_percent}% del total).
+        Las transacciones recientes son: {[t.title + ' ($' + str(t.amount) + ')' for t in data.recent_transactions]}
+        
+        Analiza brevemente esta situación y genera una recomendación ejecutiva concisa en máximo 3 oraciones.
+        """
+        
+        payload = {
+            "messages": [
+                {"role": "system", "content": "Eres un asistente financiero de la plataforma FinFlow."},
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.2,
+            "max_tokens": 300
+        }
+        
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(self.ai_endpoint, json=payload)
+                response.raise_for_status()
+                result = response.json()
+                
+            return AIAnalysisResponseDTO(ai_recommendation=result["choices"][0]["message"]["content"])
+        except httpx.RequestError as e:
+            raise HTTPException(status_code=500, detail=f"AI Engine no disponible: {str(e)}")
+
 # --- PATRÓN: DEPENDENCY INJECTION ---
 def get_repository() -> TransactionRepository:
     return TransactionRepository()
 
 def get_finance_service(repo: TransactionRepository = Depends(get_repository)) -> FinanceService:
     return FinanceService(repo)
+
+def get_ai_service() -> AIFinanceService:
+    return AIFinanceService()
 
 # --- CAPA DE CONTROLADORES / API REST ---
 app = FastAPI(
@@ -168,3 +212,21 @@ def get_summary(service: FinanceService = Depends(get_finance_service)):
 @app.delete("/api/v1/transactions/{tx_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["Transacciones"])
 def delete_transaction(tx_id: int, service: FinanceService = Depends(get_finance_service)):
     service.remove_transaction(tx_id)
+
+@app.get("/api/v1/ai-insights", response_model=AIAnalysisResponseDTO, tags=["Inteligencia Artificial"])
+async def get_ai_budget_insights(
+    finance_service: FinanceService = Depends(get_finance_service),
+    ai_service: AIFinanceService = Depends(get_ai_service)
+):
+    """Pide a Llama 3.1 que analice el estado actual de los gastos de FinFlow."""
+    summary = finance_service.calculate_summary()
+    transactions = finance_service.list_transactions()
+    
+    recent_tx = transactions[:5] 
+    
+    request_data = AIAnalysisRequestDTO(
+        summary_data=summary,
+        recent_transactions=recent_tx
+    )
+    
+    return await ai_service.analyze_budget(request_data)
