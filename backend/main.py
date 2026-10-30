@@ -132,7 +132,8 @@ class FinanceService:
 
 class AIFinanceService:
     def __init__(self):
-        self.ai_endpoint = "http://172.17.0.1:5001/v1/chat/completions"
+        # Corrección aplicada: Usando host.docker.internal para conectar con el VPS host
+        self.ai_endpoint = "http://host.docker.internal:5001/v1/chat/completions"
         
     async def analyze_budget(self, data: AIAnalysisRequestDTO) -> AIAnalysisResponseDTO:
         prompt = f"""

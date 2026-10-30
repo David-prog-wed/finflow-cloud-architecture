@@ -10,6 +10,8 @@ services:
       - finflow_db_data:/data
     networks:
       - finflow_net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     healthcheck:
       test:
         [
